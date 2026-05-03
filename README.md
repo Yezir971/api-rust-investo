@@ -4,12 +4,12 @@ api-investo/
 │   ├── config.rs        # Gestion des .env et de la config
 │   ├── routes/          # Définition des points d'entrée
 │   │   ├── mod.rs       # Agrégation des routes
-│   │   └── pokemon.rs   # Routes liées aux Pokémon
+│   │   └── user.rs      # Routes liées aux utilisateurs
 │   ├── handlers/        # Fonctions de traitement (Logique métier)
 │   │   ├── mod.rs
-│   │   └── pokemon.rs
+│   │   └── user.rs
 │   └── models/          # Structs Serde et SQLx
 │       ├── mod.rs
-│       └── pokemon.rs
+│       └── user.rs
 ├── .env
 └── Cargo.toml# api-rust-investo
