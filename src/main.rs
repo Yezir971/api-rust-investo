@@ -20,7 +20,7 @@ async fn main() -> Result<(), sqlx::Error> {
     dotenvy::dotenv().ok();
     let db_url = std::env::var("DATABASE_URL").expect("DB_URL manquante");
 
-    // Connexion avec postgress
+    // Connexion witch postgress
     let pool = PgPoolOptions::new()
         .connect(&db_url)
         .await
