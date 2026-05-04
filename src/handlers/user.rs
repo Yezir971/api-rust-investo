@@ -1,9 +1,12 @@
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Json, extract::{State, Path}, http::StatusCode, response::IntoResponse};
 use serde_json::json;
 use sqlx::PgPool;
 use crate::models::user::{UserModel, UserResponse}; 
 use crate::schema::user::CreateUserSchema;
 use hashed_password::HashedPassword;
+use uuid::Uuid;
+
+
 
 pub async fn create_user_handler(
     State(pool): State<PgPool>,
@@ -46,6 +49,46 @@ pub async fn create_user_handler(
             Err((status, Json(json!({
                 "status": "error",
                 "message": err_msg
+            }))))
+        }
+    }
+}
+pub async fn get_user_handler(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    
+    let result = sqlx::query_as!(
+        UserModel,
+        r#"SELECT * FROM users WHERE id = $1"#,
+        &id,
+    )
+    .fetch_one(&pool)
+    .await;
+
+    match result {
+        Ok(user) => {
+            let user_response = UserResponse {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+            };
+            Ok((StatusCode::OK, Json(json!({
+                "status": "success",
+                "data": user_response
+            }))))
+        }
+        Err(e) => {
+            let err_msg = e.to_string();
+            let (status, message) = if err_msg.contains("no rows returned") {
+                (StatusCode::NOT_FOUND, "User not found".to_string())
+            } else {
+                (StatusCode::INTERNAL_SERVER_ERROR, err_msg)
+            };
+            
+            Err((status, Json(json!({
+                "status": "error",
+                "message": message
             }))))
         }
     }

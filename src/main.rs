@@ -31,7 +31,7 @@ async fn main() -> Result<(), sqlx::Error> {
     let app = Router::new()
         .route("/health", get(|| async {StatusCode::OK}))
         .route("/", get(|| async { "Hello, World!" }))
-        .nest("/api",user_routes() )
+        .nest("/api/user",user_routes() )
         .with_state(pool);
 
     // run our app with hyper, listening globally on port 3000

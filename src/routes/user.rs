@@ -1,9 +1,10 @@
 
-use axum::{routing::{post}, Router};
+use axum::{routing::{post, get}, Router};
 use sqlx::PgPool;
-use crate::handlers::user::{create_user_handler };
+use crate::handlers::user::{create_user_handler,get_user_handler };
 
 pub fn user_routes() -> Router<PgPool> {
     Router::new()
-        .route("/user/create", post(create_user_handler))
+        .route("/", post(create_user_handler))
+        .route("/{id}", get(get_user_handler))
 }
