@@ -115,7 +115,6 @@ pub async fn auth_user_handler(
                 ));
             }
 
-            let my_secret = "secret_tres_bien_garde";
             // date d'expration du token 
             let expiration = Utc::now()
             .checked_add_signed(Duration::hours(24))
@@ -129,7 +128,7 @@ pub async fn auth_user_handler(
             let jwt_user = encode(
                 &Header::default(), 
                 &my_claims, 
-                &EncodingKey::from_secret(&my_secret.as_ref())
+                &EncodingKey::from_secret(&state.jwt_secret.as_ref())
             ).map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Erreur génération token"}))))?;
 
             Ok((StatusCode::OK, Json(json!({

@@ -5,11 +5,12 @@ mod schema;
 use schema::{AppState};
 
 use routes::user_routes;
+use tower_http::cors::CorsLayer;
 
 use axum::{
     routing::get,
     Router,
-    http::StatusCode,
+    http::{StatusCode, Method},
 };
 use sqlx::postgres::PgPoolOptions;
 
@@ -23,6 +24,13 @@ async fn main() -> Result<(), sqlx::Error> {
     dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL manquant");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET manquant");
+
+
+    let origins = [
+        "http://localhost:4200".parse().unwrap(),
+    ];
+
+    let layer = CorsLayer::new().allow_origin(origins).allow_methods([Method::GET, Method::POST]).allow_headers([axum::http::header::CONTENT_TYPE]);
 
     // Connexion witch postgress
     let pool = PgPoolOptions::new()
@@ -41,7 +49,8 @@ async fn main() -> Result<(), sqlx::Error> {
         .route("/health", get(|| async {StatusCode::OK}))
         .route("/", get(|| async { "Hello, World!" }))
         .nest("/api/user",user_routes() )
-        .with_state(state);
+        .with_state(state)
+        .layer(layer);
 
 
 
