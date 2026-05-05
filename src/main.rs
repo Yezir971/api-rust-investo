@@ -17,6 +17,8 @@ use sqlx::postgres::PgPoolOptions;
 use dotenvy::dotenv;
 use std::env;
 
+use crate::routes::bot_routes;
+
 
 
 #[tokio::main]
@@ -24,6 +26,7 @@ async fn main() -> Result<(), sqlx::Error> {
     dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL manquant");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET manquant");
+    let master_encryption_key = env::var("MASTER_ENCRYPTION_KEY").expect("MASTER_ENCRYPTION_KEY manquant");
 
 
     let origins = [
@@ -42,6 +45,7 @@ async fn main() -> Result<(), sqlx::Error> {
     let state = AppState {
         pool,
         jwt_secret: jwt_secret,
+        master_encryption_key,
     };
 
     // build our application with a single route
@@ -49,6 +53,7 @@ async fn main() -> Result<(), sqlx::Error> {
         .route("/health", get(|| async {StatusCode::OK}))
         .route("/", get(|| async { "Hello, World!" }))
         .nest("/api/user",user_routes() )
+        .nest("/api/bot", bot_routes())
         .with_state(state)
         .layer(layer);
 
