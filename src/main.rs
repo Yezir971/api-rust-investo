@@ -4,6 +4,9 @@ mod routes;
 mod schema;
 use schema::{AppState};
 
+use dashmap::DashMap;
+use std::sync::Arc;
+
 use routes::user_routes;
 use tower_http::cors::CorsLayer;
 
@@ -27,8 +30,9 @@ async fn main() -> Result<(), sqlx::Error> {
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL manquant");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET manquant");
     let master_encryption_key = env::var("MASTER_ENCRYPTION_KEY").expect("MASTER_ENCRYPTION_KEY manquant");
+    let active_bots = Arc::new(DashMap::new());
 
-
+    
     let origins = [
         "http://localhost:4200".parse().unwrap(),
     ];
@@ -46,6 +50,7 @@ async fn main() -> Result<(), sqlx::Error> {
         pool,
         jwt_secret: jwt_secret,
         master_encryption_key,
+        active_bots,
     };
 
     // build our application with a single route

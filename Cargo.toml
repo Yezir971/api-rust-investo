@@ -16,6 +16,7 @@ jsonwebtoken = { workspace = true }
 tower-http = { workspace = true }
 hashed_password = { workspace = true }
 tokio = { workspace = true }
+dashmap = "6.1.0"
 
 # On ajoute le lien vers le module partagé
 shared = { path = "../shared" }
