@@ -124,37 +124,50 @@ pub async fn get_user_balance(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let solde_info = shared::repositories::api_bot_repo::give_solde(&state.pool, id)
+        .await
+        .map_err(|e| {
+            eprintln!("Erreur BDD solde : {}", e);
+            (StatusCode::NOT_FOUND, "Utilisateur ou solde introuvable".to_string())
+        })?;
+
+    Ok(Json(serde_json::json!({
+        "status": "success",
+        "asset": "EUR", 
+        "balance": solde_info.virtual_balance,
+        "user_id": solde_info.id_user
+    })))
     
-    // 1. Récupérer les clés API déchiffrées de l'utilisateur
-    let keys = api_key_repo::get_decrypted_keys(
-        &state.pool, 
-        id, 
-        state.master_encryption_key.as_bytes()
-    ).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    // // récupérer les clés API déchiffrées de l'utilisateur
+    // let keys = api_key_repo::get_decrypted_keys(
+    //     &state.pool, 
+    //     id, 
+    //     state.master_encryption_key.as_bytes()
+    // ).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // On prend la première clé (ou on gère l'absence de clé)
-    let key_info = keys.first()
-        .ok_or((StatusCode::NOT_FOUND, "Aucune clé API configurée pour cet utilisateur".to_string()))?;
+    // // On prend la première clé (ou on gère l'absence de clé)
+    // let key_info = keys.first()
+    //     .ok_or((StatusCode::NOT_FOUND, "Aucune clé API configurée pour cet utilisateur".to_string()))?;
 
-    // 2. Créer une instance temporaire de l'exchange pour la requête
-    let exchange = MockExchange::new(
-        key_info.key.clone(), 
-        key_info.secret.clone(),
-    );
+    // // créer une instance temporaire de l'exchange pour la requête
+    // let exchange = MockExchange::new(
+    //     key_info.key.clone(), 
+    //     key_info.secret.clone(),
+    // );
 
-    // Pour le MVP, on se concentre sur l'USDT
-    match exchange.get_solde_current("USDT").await {
-        Ok(balance) => {
-            Ok(Json(serde_json::json!({
-                "status": "success",
-                "asset": "USDT",
-                "balance": balance,
-                "user_id": id
-            })))
-        },
-        Err(e) => {
-            eprintln!("Erreur lors de la récupération du solde : {}", e);
-            Err((StatusCode::BAD_GATEWAY, "Impossible de joindre Crypto.com ou signature invalide".to_string()))
-        }
-    }
+    // // Pour le MVP, on se concentre sur l'USDT
+    // match exchange.get_solde_current("USDT").await {
+    //     Ok(balance) => {
+    //         Ok(Json(serde_json::json!({
+    //             "status": "success",
+    //             "asset": "USDT",
+    //             "balance": balance,
+    //             "user_id": id
+    //         })))
+    //     },
+    //     Err(e) => {
+    //         eprintln!("Erreur lors de la récupération du solde : {}", e);
+    //         Err((StatusCode::BAD_GATEWAY, "Impossible de joindre Crypto.com ou signature invalide".to_string()))
+    //     }
+    // }
 }
