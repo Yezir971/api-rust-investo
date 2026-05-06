@@ -1,7 +1,7 @@
 use axum::{Json, extract::{State, Path}, http::StatusCode, response::IntoResponse};
 use serde_json::json;
 // use crate::models::{UserModel, UserResponse}; 
-use crate::schema::{UserModel, UserResponse,CreateUserSchema, AuthUserSchema,Claims, AppState};
+use crate::schema::{UserModel, UserResponse,CreateUserSchema, AuthUserSchema,Claims, AppState, CreateUserModel};
 use hashed_password::HashedPassword;
 use uuid::Uuid;
 use chrono::{Utc, Duration};
@@ -17,13 +17,24 @@ pub async fn create_user_handler(
     let hashed_password_str = hp.to_string();
     let id = uuid::Uuid::new_v4();
     let result = sqlx::query_as!(
-        UserModel,
-        r#"INSERT INTO users (id, name, lastname, password, email) VALUES ($1, $2, $3, $4, $5) RETURNING *"#,
+        CreateUserModel,
+        r#"
+        INSERT INTO users (id, name, lastname, password, email, virtual_balance) 
+        VALUES ($1, $2, $3, $4, $5, $6) 
+        RETURNING 
+            id, 
+            name, 
+            lastname, 
+            password, 
+            email, 
+            virtual_balance as "virtual_balance!"
+        "#,
         &id,
         &body.name,
         &body.lastname,
         &hashed_password_str,
-        &body.email
+        &body.email,
+        1000.0
     ).fetch_one(&state.pool).await;
 
     match result {
@@ -32,6 +43,7 @@ pub async fn create_user_handler(
                 id: user.id,
                 name: user.name,
                 email: user.email,
+                virtual_balance: user.virtual_balance,
             };
             
             Ok((StatusCode::CREATED, Json(json!({
@@ -61,7 +73,7 @@ pub async fn get_user_handler(
     
     let result = sqlx::query_as!(
         UserModel,
-        r#"SELECT * FROM users WHERE id = $1"#,
+        r#"SELECT id, name, lastname, password, email,created_at , virtual_balance as "virtual_balance!" FROM users WHERE id = $1"#,
         &id,
     )
     .fetch_one(&state.pool)
@@ -73,6 +85,7 @@ pub async fn get_user_handler(
                 id: user.id,
                 name: user.name,
                 email: user.email,
+                virtual_balance: user.virtual_balance
             };
             Ok((StatusCode::OK, Json(json!({
                 "status": "success",
@@ -101,7 +114,7 @@ pub async fn auth_user_handler(
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
     let result = sqlx::query_as!(
         UserModel, 
-        r#"SELECT * FROM users WHERE email=$1"#,
+        r#"SELECT id, name, lastname, password, email,created_at , virtual_balance as "virtual_balance!" FROM users WHERE email=$1"#,
         &body.email
     ).fetch_one(&state.pool).await;
 
@@ -138,6 +151,7 @@ pub async fn auth_user_handler(
                     id: user.id,
                     name: user.name,
                     email: user.email,
+                    virtual_balance: user.virtual_balance,
                 }
             }))))
         }

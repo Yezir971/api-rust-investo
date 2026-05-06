@@ -19,6 +19,18 @@ pub struct AuthUserSchema{
 }
 
 #[derive(Serialize)]
+pub struct CreateUserModel {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub lastname: String,
+    pub password: String,
+    pub email: String,
+    pub virtual_balance: f64,
+
+}
+
+
+#[derive(Serialize)]
 pub struct UserModel {
     pub id: uuid::Uuid,
     pub name: String,
@@ -26,6 +38,7 @@ pub struct UserModel {
     pub password: String,
     pub email: String,
     pub created_at: Option<DateTime<Utc>>,
+    pub virtual_balance: f64,
 }
 
 #[derive(serde::Serialize)]
@@ -33,5 +46,6 @@ pub struct UserResponse {
     pub id: Uuid,
     pub name: String,
     pub email: String,
+    pub virtual_balance : f64,
 }
 

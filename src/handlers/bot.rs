@@ -6,7 +6,9 @@ use uuid::Uuid;
 use std::sync::Arc;
 
 use bot_investo::{brain::run_brain_bot, exchange::Exchange}; 
-use bot_investo::exchange::cryptocom::CryptoComExchange;
+// use bot_investo::exchange::cryptocom::CryptoComExchange;
+// use bot_investo::exchange::mock::MockExchange;
+use bot_investo::exchange::mock::*;
 use crate::schema::BotControl;
 
 pub async fn add_api_key(
@@ -62,7 +64,7 @@ pub async fn start_bot(
     let key_info = keys.first().ok_or((StatusCode::NOT_FOUND, "Pas de clés".to_string()))?;
     
     
-    let exchange = Arc::new(CryptoComExchange::new(
+    let exchange = Arc::new(MockExchange::new(
         key_info.key.clone(),
         key_info.secret.clone()
     ));
@@ -135,7 +137,7 @@ pub async fn get_user_balance(
         .ok_or((StatusCode::NOT_FOUND, "Aucune clé API configurée pour cet utilisateur".to_string()))?;
 
     // 2. Créer une instance temporaire de l'exchange pour la requête
-    let exchange = CryptoComExchange::new(
+    let exchange = MockExchange::new(
         key_info.key.clone(), 
         key_info.secret.clone(),
     );
