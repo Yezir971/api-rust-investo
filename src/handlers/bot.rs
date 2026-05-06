@@ -5,7 +5,7 @@ use crate::schema::AppState;
 use uuid::Uuid;
 use std::sync::Arc;
 
-use bot_investo::brain::run_brain_bot; 
+use bot_investo::{brain::run_brain_bot, exchange::Exchange}; 
 use bot_investo::exchange::cryptocom::CryptoComExchange;
 use crate::schema::BotControl;
 
@@ -60,19 +60,17 @@ pub async fn start_bot(
     ).await.map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Erreur BDD".to_string()))?;
 
     let key_info = keys.first().ok_or((StatusCode::NOT_FOUND, "Pas de clés".to_string()))?;
-    let url_brocker = "https://api.crypto.com/v2/";
     
     
     let exchange = Arc::new(CryptoComExchange::new(
         key_info.key.clone(),
-        key_info.secret.clone(),
-        url_brocker.to_string()
+        key_info.secret.clone()
     ));
 
-    // 4. Spawn
-    let id_str = body.user_id;
+
+    let pool = state.pool.clone(); // On clone la connexion pour le thread du bot
     let handle = tokio::spawn(async move {
-        run_brain_bot(&id_str.to_string(), exchange, "BTC_USDT".to_string()).await;
+        run_brain_bot(body.user_id, pool, exchange, "BTC_USDT".to_string()).await;
     });
 
     // Enregistre dans la DashMap
@@ -118,4 +116,43 @@ pub async fn stop_bot(
         Err((StatusCode::NOT_FOUND, error_body))
     }
 
+}
+
+pub async fn get_user_balance(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    
+    // 1. Récupérer les clés API déchiffrées de l'utilisateur
+    let keys = api_key_repo::get_decrypted_keys(
+        &state.pool, 
+        id, 
+        state.master_encryption_key.as_bytes()
+    ).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // On prend la première clé (ou on gère l'absence de clé)
+    let key_info = keys.first()
+        .ok_or((StatusCode::NOT_FOUND, "Aucune clé API configurée pour cet utilisateur".to_string()))?;
+
+    // 2. Créer une instance temporaire de l'exchange pour la requête
+    let exchange = CryptoComExchange::new(
+        key_info.key.clone(), 
+        key_info.secret.clone(),
+    );
+
+    // Pour le MVP, on se concentre sur l'USDT
+    match exchange.get_solde_current("USDT").await {
+        Ok(balance) => {
+            Ok(Json(serde_json::json!({
+                "status": "success",
+                "asset": "USDT",
+                "balance": balance,
+                "user_id": id
+            })))
+        },
+        Err(e) => {
+            eprintln!("Erreur lors de la récupération du solde : {}", e);
+            Err((StatusCode::BAD_GATEWAY, "Impossible de joindre Crypto.com ou signature invalide".to_string()))
+        }
+    }
 }
