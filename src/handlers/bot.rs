@@ -1,20 +1,21 @@
 use axum::{extract::{State, Path}, Json, http::StatusCode, response::IntoResponse};
 use shared::repositories::api_key_repo;
 use crate::schema::bot::{CreateApiKeySchema, StartBotSchema};
-use crate::schema::AppState; 
+use crate::schema::{AppState, Claims}; 
 use uuid::Uuid;
 use std::sync::Arc;
+use crate::utils::utils::verify_owner;
 
-use bot_investo::{brain::run_brain_bot, exchange::Exchange}; 
-// use bot_investo::exchange::cryptocom::CryptoComExchange;
-// use bot_investo::exchange::mock::MockExchange;
+use bot_investo::{brain::run_brain_bot}; 
 use bot_investo::exchange::mock::*;
 use crate::schema::BotControl;
 
 pub async fn add_api_key(
     State(state): State<AppState>,
+    extensions: axum::Extension<Claims>,
     Json(payload): Json<CreateApiKeySchema>,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    verify_owner(&extensions.sub, payload.user_id)?;
     
     // On récupère la clé de chiffrement
     let master_key = state.master_encryption_key;
@@ -28,14 +29,22 @@ pub async fn add_api_key(
         master_key.as_bytes()
     )
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Erreur BDD: {}", e)))?;
+    .map_err(|e| (
+        StatusCode::INTERNAL_SERVER_ERROR, 
+        Json(serde_json::json!({"status": "error", "message": format!("Erreur BDD: {}", e)}))
+    ))?;
 
-    Ok((StatusCode::CREATED, Json(serde_json::json!({"message": "Clé API enregistrée et chiffrée"}))))
+    Ok((
+        StatusCode::CREATED, 
+        Json(serde_json::json!({"message": "Clé API enregistrée et chiffrée"}))
+    ))
 }
 
 pub async fn status_bot(
     State(state): State<AppState>,
+    extensions: axum::Extension<Claims>,
     Path(id): Path<Uuid>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>{
+        verify_owner(&extensions.sub, id)?;
         let is_active = state.active_bots.contains_key(&id);
         Ok(Json(serde_json::json!({
             "status": "success",
@@ -47,8 +56,11 @@ pub async fn status_bot(
 
 pub async fn start_bot(
     State(state): State<AppState>,
+    extensions: axum::Extension<Claims>,
     Json(body): Json<StartBotSchema>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)>{
+    verify_owner(&extensions.sub, body.user_id);
+
     // Vérifie si le bot ne tourne pas déjà
     if state.active_bots.contains_key(&body.user_id) {
         return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"message": "Bot déjà lancé", "status": "error"})).to_string()));
@@ -89,13 +101,14 @@ pub async fn start_bot(
 
 pub async fn stop_bot(
     State(state): State<AppState>,
+    extensions: axum::Extension<Claims>,
     Json(body): Json<StartBotSchema>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)>{
+    verify_owner(&extensions.sub, body.user_id);
 
     // On vérifie si le bot existait bien dans la map
     if let Some((_, bot_control)) = state.active_bots.remove(&body.user_id) {
         
-        // 2. On tue le thread Tokio immédiatement
         bot_control.handle.abort();
         
         println!("✅ Bot stoppé proprement pour {}", body.user_id);
@@ -106,7 +119,7 @@ pub async fn stop_bot(
             "is_active": false
         })))
     } else {
-        // 3. Si l'ID n'était pas dans la map, le bot ne tournait pas
+        // si l'ID n'était pas dans la map, le bot ne tournait pas
         println!("Aucun bot actif trouvé pour {}", body.user_id);
         
         let error_body = serde_json::json!({ 
@@ -122,8 +135,11 @@ pub async fn stop_bot(
 
 pub async fn get_user_balance(
     State(state): State<AppState>,
+    extensions: axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    verify_owner(&extensions.sub, id);
+
     let solde_info = shared::repositories::api_bot_repo::give_solde(&state.pool, id)
         .await
         .map_err(|e| {

@@ -1,6 +1,6 @@
 use axum::{Json, extract::{State, Path}, http::StatusCode, response::IntoResponse};
 use serde_json::json;
-// use crate::models::{UserModel, UserResponse}; 
+use crate::utils::utils::verify_owner;
 use crate::schema::{UserModel, UserResponse,CreateUserSchema, AuthUserSchema,Claims, AppState, CreateUserModel};
 use hashed_password::HashedPassword;
 use uuid::Uuid;
@@ -68,8 +68,10 @@ pub async fn create_user_handler(
 }
 pub async fn get_user_handler(
     State(state): State<AppState>,
+    extensions: axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    verify_owner(&extensions.sub, id)?;
     
     let result = sqlx::query_as!(
         UserModel,

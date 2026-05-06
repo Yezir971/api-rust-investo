@@ -17,6 +17,7 @@ tower-http = { workspace = true }
 hashed_password = { workspace = true }
 tokio = { workspace = true }
 dashmap = "6.1.0"
+async-trait = "0.1.89"
 
 # On ajoute le lien vers le module partagé
 shared = { path = "../shared" }

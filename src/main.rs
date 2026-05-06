@@ -2,6 +2,8 @@
 mod handlers;
 mod routes;
 mod schema;
+mod middleware;
+mod utils;
 use schema::{AppState};
 
 
@@ -12,10 +14,13 @@ use routes::user_routes;
 use tower_http::cors::CorsLayer;
 
 use axum::{
-    routing::get,
+    routing::{get, post},
     Router,
     http::{StatusCode, Method},
 };
+use crate::handlers::{create_user_handler, auth_user_handler };
+
+
 use sqlx::postgres::PgPoolOptions;
 
 use dotenvy::dotenv;
@@ -54,18 +59,24 @@ async fn main() -> Result<(), sqlx::Error> {
         active_bots,
     };
 
-    // build our application with a single route
-    let app = Router::new()
-        .route("/health", get(|| async {StatusCode::OK}))
-        .route("/", get(|| async { "Hello, World!" }))
-        .nest("/api/user",user_routes() )
+    // route publique 
+    let public_routes = Router::new()
+        .route("/api/user/auth", post(auth_user_handler))
+        .route("/api/user/signup", post(create_user_handler));
+
+    // routes protégées
+    let protected_routes = Router::new()
+        .route("/health", get(|| async { StatusCode::OK }))
+        .nest("/api/user", user_routes())
         .nest("/api/bot", bot_routes())
-        .with_state(state)
+        .route_layer(axum::middleware::from_fn_with_state(state.clone(), crate::middleware::auth::auth_middleware));
+
+    let app = Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
+        .with_state(state)  
         .layer(layer);
 
-
-
-    // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
     Ok(())
