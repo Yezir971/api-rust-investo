@@ -20,3 +20,4 @@ dashmap = "6.1.0"
 
 # On ajoute le lien vers le module partagé
 shared = { path = "../shared" }
+bot-investo = { path = "../bot-investo" }

@@ -8,3 +8,7 @@ pub struct CreateApiKeySchema{
     pub api_key: String,
     pub api_secret: String,
 }
+#[derive(Deserialize)]
+pub struct StartBotSchema{
+    pub user_id: Uuid,
+}
