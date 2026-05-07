@@ -5,7 +5,7 @@ mod schema;
 mod middleware;
 mod utils;
 use schema::{AppState};
-
+use std::time::Duration;
 
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -46,11 +46,31 @@ async fn main() -> Result<(), sqlx::Error> {
     let layer = CorsLayer::new().allow_origin(origins).allow_methods([Method::GET, Method::POST]).allow_headers([axum::http::header::CONTENT_TYPE]);
 
     // Connexion witch postgress
-    let pool = PgPoolOptions::new()
-        .connect(&db_url)
-        .await
-        .expect("Échec connexion BDD");
+    let mut retry_count = 0;
+    let max_retries = 10;
 
+    let pool = loop {
+        match PgPoolOptions::new()
+            .max_connections(5)
+            .acquire_timeout(Duration::from_secs(30))
+            .connect(&db_url)
+            .await 
+        {
+            Ok(p) => {
+                println!("✅ Connexion à la base de données réussie !");
+                break p;
+            },
+            Err(e) => {
+                retry_count += 1;
+                println!("❌ ÉCHEC CONNEXION : {:?}", e);
+                println!("⚠️ BDD non prête (tentative {}/{})... On attend 2s", retry_count, max_retries);
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+        }
+    };
+    // Lancement des migrations
+    tracing::info!("Vérification des migrations...");
+    shared::run_migrations(&pool).await.expect("Échec des migrations");
 
     let state = AppState {
         pool,
